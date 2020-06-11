@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>websocket demo</title>
+    <style>
+        .s1 {
+            width: 500px;
+            height: 200px; /*设置div的大小*/
+            border: 1px solid green; /*边框*/
+            text-align: center; /*文字水平居中对齐*/
+            overflow: hidden;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+<div class="s1">
+    <h3></h3>
+    <div id="result"></div>
+    <h3></h3>
+    <input type="text" id="msg" autocomplete="off" placeholder="请输入">
+    <h3></h3>
+    <button onclick="sendMsg()">发送</button>
+</div>
+
+<script>
+    var host = "ws:" + window.location.hostname + ":10000/websocket";
+    var ws = new WebSocket(host);
+    // var ws = new WebSocket("ws:localhost:10000/websocket");
+    var result = document.querySelector('#result');
+    ws.onopen = function () {
+        result.innerHTML = 'websocket已连接';
+        console.log('websocket已连接！');
+    }
+
+    ws.onmessage = function (e) {
+        console.log(e.data);
+        result.innerHTML = e.data;
+    }
+    ws.onclose = function (e) {
+        console.log('websocket已断开连接: 错误码:' + e.code + ' 断开原因:' + e.reason + ' 是否正常断开:' + e.wasClean)
+    }
+
+    function sendMsg() {
+        var msg = document.querySelector('#msg').value;
+        ws.send(msg);
+        //ws.send(JSON.stringify(message));    // 复杂的数据结构要先进行序列化
+    }
+</script>
+</body>
+</html>
