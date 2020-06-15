@@ -42,7 +42,7 @@ bottle.TEMPLATE_PATH.append("/")  # 指定模板目录
 @route("/")
 def callback():
 	# return static_file("demo.html", root=".")
-	return static_file("simple.html", root=".")
+	return static_file("demo.html", root=".")
 
 
 @route("/assets/<path:path>")

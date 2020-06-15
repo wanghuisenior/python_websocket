@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>餐饮订单辅助系统后台</title>
+    <meta name="renderer" content="webkit">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <script src="./assets/jquery.min.js"></script>
+    <script src="./assets/jquery.cookie.min.js"></script>
+    <script src="./assets/layui-v2.5.6/layui.js"></script>
+    <script src="./assets/moment.min.js"></script>
+    <link rel="stylesheet" href="./assets/layui-v2.5.6/css/layui.css" media="all">
+    <style type="text/css">
+        /*.layui-table-cell {*/
+        /*    height: auto;*/
+        /*    overflow: visible;*/
+        /*    text-overflow: inherit;*/
+        /*    white-space: normal;*/
+        /*}*/
+
+    </style>
+</head>
+<body>
+
+<div class="layui-fluid" style="width: 80%">
+    <ul class="layui-nav layui-bg-green">
+        <li class="layui-nav-item"><a href="" style="font-size: larger">订单辅助系统</a></li>
+        <li class="layui-nav-item"><a href="login" style="font-size: smaller">返回</a></li>
+    </ul>
+    <hr/>
+    <div class="layui-card">
+        <div class="layui-card-header">
+            <div class="layui-form">
+                <div class="layui-row">
+                    <div class="layui-col-md2">
+                        <select name="restaurant" id="restaurant" lay-filter="restaurant">
+                            <option value="0">门店列表</option>
+                        </select>
+                    </div>
+                    <div class="layui-col-md4">
+                        <div class="layui-input-block">
+                            <input type="text" id="msg" required lay-verify="required" placeholder="websocket测试"
+                                   value="测试消息" autocomplete="off" class="layui-input">
+                        </div>
+
+                    </div>
+                    <div class="layui-col-md2">
+                        <button class="layui-btn layui-btn-sm" style="margin-bottom: 5px" onclick="sendMsg()">测试
+                        </button>
+                    </div>
+                    <div class="layui-col-md4">
+                        <div id="result"></div>
+                    </div>
+                </div>
+
+
+            </div>
+        </div>
+
+        <div class="layui-card-body">
+            <table class="layui-hide" id="test-table-simple" lay-filter="test-table-simple"></table>
+        </div>
+    </div>
+</div>
+<script type="text/html" id="barDemo">
+    <!-- 每行后面的操作工具栏-->
+    <a class="layui-btn layui-btn-sm" lay-event="yes">确认</a>
+    <a class="layui-btn layui-btn-danger layui-btn-sm" lay-event="no">关闭</a>
+</script>
+<script>
+    var tableInstance;
+    layui.use(['table'], function () {
+        tableInstance = layui.table;
+        tableInstance.render({
+            elem: '#test-table-simple',
+            url: 'index',
+            cellMinWidth: 80, //全局定义常规单元格的最小宽度，layui 2.2.1 新增
+            page: true,
+            limit: 10,//每页默认显示的数量
+            where: {'restaurantid': $('#restaurant').val()},
+            even: true,
+            loading: true, //翻页加loading
+            size: 'lg',
+            // request: {limitName: 'page_size'},
+            cols: [[
+                {type: 'numbers', title: '序号'},
+                {field: 'code', width: 100, title: '预约号', align: 'center'},
+                {field: 'dish_name', title: '菜品名称', align: 'center'},
+                {field: 'number', width: 60, title: '数量', align: 'center'},
+                {
+                    field: 'remark', title: '备注', align: 'center', templet: function (d) {
+                        return '<div style="text-align: left">' + d.remark + '</div>';
+                    }
+                },
+                {
+                    field: 'time', width: 90, title: '下单时间', templet: function (d) {
+                        // var md = moment(d.time).format('YYYY-MM-DD');
+                        // var mt = moment(d.time).format('HH:mm:ss');
+                        // var a = '<span style="color: #c00; font-size: 10px;">' + md + '</span>' + '<br>' + '<span style="color: #c00; font-size: 10px;">' + mt + '</span>';
+                        // console.log(a)
+                        // return a;
+                        return moment(d.time).format('HH:mm');
+                    }
+                },
+                {field: 'orderStatus', width: 100, title: '订单状态', align: 'center'},
+                {
+                    field: '', width: 180, toolbar: '#barDemo', title: '操作', align: 'center',
+                }
+            ]],
+            done: function (result, page, count) {
+                layer.closeAll();
+                // console.log(data, page, count)
+            }
+        });
+        //监听每行右侧工具栏事件
+        tableInstance.on('tool(test-table-simple)', function (obj) {//注：tool是工具条事件名，test是table原始容器的属性 lay-filter="对应的值"
+            switch (obj.event) {
+                case 'yes':
+                    layer.confirm('确认消费该订单吗?', function (index) {
+                        layer.close(index);
+                        $.getJSON('consumeOrderById', {'orderId': obj.data.orderId}, function (res) {
+                            if (res == '200') {
+                                layer.msg('消费成功', {icon: 1, time: 500});
+                                tableReload();
+                            } else layer.msg('消费失败', {icon: 2});
+                        })
+                    });
+                    break;
+                case 'no':
+                    layer.confirm('确认关闭该订单吗?', function (index) {
+                        layer.close(index);
+                        $.getJSON('closeOrderById', {'orderId': obj.data.orderId}, function (res) {
+                            if (res == '200') {
+                                layer.msg('成功', {icon: 1});
+                                tableReload();
+                            } else layer.msg('失败', {icon: 2});
+                        })
+                    });
+                    break;
+
+            }
+        });
+    });
+    layui.use(['form'], function () {
+        var form = layui.form;
+        form.on('select(restaurant)', function (data) {
+            $.cookie('selected', data.value);
+        });
+
+    });
+
+    function tableReload() {
+        var i = layer.load();
+        tableInstance.reload('test-table-simple')
+
+    }
+
+    <!-- websocket部分，小程序端发送数据到服务端，服务端再重新发送接收到的数据给所有连接的用户-->
+    var host = "ws:" + window.location.hostname + ":10000/websocket";
+    var ws = new WebSocket(host);
+    console.log('host:', host)
+    // var ws = new WebSocket("ws:localhost:10000/websocket");
+    ws.onopen = function () {
+        console.log('websocket已连接！');
+    }
+
+    ws.onmessage = function (e) {
+        console.log(e.data);
+        document.querySelector('#result').innerHTML = e.data;
+    }
+    ws.onclose = function (e) {
+        console.log('websocket已断开连接: 错误码:' + e.code + ' 断开原因:' + e.reason + ' 是否正常断开:' + e.wasClean)
+    }
+
+    function sendMsg() {
+        var msg = document.querySelector('#msg').value;
+        console.log(msg)
+        ws.send(msg);
+        //ws.send(JSON.stringify(message));    // 复杂的数据结构要先进行序列化
+    }
+
+    setRestaurantList();
+
+    function setRestaurantList() {
+        var cookie_obj = eval('(' + decode_cookie($.cookie('restaurants')) + ')')
+        var restaurantObj = document.getElementById('restaurant');
+        $.each(cookie_obj, function (i, obj) {
+            var optionObj = document.createElement("option");
+            optionObj.value = obj['rid'];
+            optionObj.text = obj['rname'];
+            restaurantObj.appendChild(optionObj);
+        });
+        var selected = $.cookie('selected')
+        $.each(restaurantObj.options, function (i, o) {
+            if (o.value == selected) {
+                restaurantObj.options[i].selected = true;
+            }
+        })
+    }
+
+    function decode_cookie(val) {
+        if (val.indexOf('\\') === -1) {
+            return val;  // not encoded
+        }
+        // val = val.slice(1, -1).replace(/\\"/g, '"');
+        val = val.replace(/\\"/g, '"');
+        val = val.replace(/\\(\d{3})/g, function (match, octal) {
+            return String.fromCharCode(parseInt(octal, 8));
+        });
+        return val.replace(/\\\\/g, '\\');
+    }
+</script>
+</body>
+</html>

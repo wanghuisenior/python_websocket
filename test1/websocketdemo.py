@@ -9,16 +9,20 @@
 """
 # websocketdemo.py
 # pip install bottle-websocket
+import json
 import os
+import re
 import socket
 
-import bottle
-
 try:
-	from bottle import route, run, static_file, request
+	import requests
+	import bottle
+	import geventwebsocket
+	from bottle import route, run, static_file, request, response, redirect, template, error
 	from bottle.ext.websocket import GeventWebSocketServer
 	from bottle.ext.websocket import websocket
 except ModuleNotFoundError:
+	os.system('pip install requests')
 	os.system('pip install bottle-websocket')
 
 
@@ -42,7 +46,7 @@ bottle.TEMPLATE_PATH.append("/")  # 指定模板目录
 @route("/")
 def callback():
 	# return static_file("demo.html", root=".")
-	return static_file("simple.html", root=".")
+	return static_file("login.html", root=".")
 
 
 @route("/assets/<path:path>")
@@ -61,17 +65,150 @@ def callback(ws):
 		if rec:
 			print('rec:', rec)
 			for u in users:
-				u.send('服务端接收到了：' + rec)  # 发送信息给所有的客户端
+				try:
+					u.send('服务端接收到了：' + rec)  # 发送信息给所有的客户端
+				except geventwebsocket.exceptions.WebSocketError as e:
+					print('发送消息时，之前建立的链接异常断掉了')
 		else:
 			break  # 如果有客户端断开连接，则踢出users集合
 
 
 @route("/index", method=["GET", "POST"])  # method 默认GET,可以指定其他请求或者请求方式列表
 def index():
-	print('index', request.GET)
+	# print(request.method)  # POST
+	# print(request.forms)  # post请求信息
+	# print(request.query)  # get 请求数据
+	# print(request.body)  # POST 请求数据
+	# print(request.files)  # 上传的文件信息
+	# print(request.cookies)  # cookie信息
+	# print(request.environ)  # 环境信息
+	# print(request.json)  #
+	# print(request.params)  #
+	q = {}
+	for k in request.query:
+		if k == 'page':
+			q[k] = int(request.query[k]) - 1
+		elif k == 'limit':
+			q['page_size'] = int(request.query[k])
+		else:
+			q[k] = int(request.query[k])
+
+	if q:  # 请求带参数，返回json
+		# 获取所有订单信息
+		q['type'] = 8
+		print(q)
+		headers = {
+			'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac 05 X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36',
+		}
+		try:
+			res = session.get(
+				url='http://xcx.zitcloud.cn/api/restaurant/order/orderList', headers=headers, params=q)
+			order_list = res.json()['orderVoList']
+		except:
+			# 登录失效了
+			return json.dumps({'code': 400, 'msg': '请求失败，请重新登录'})
+		d = []
+		for data in order_list:
+			for item in data['orderItem']:
+				d.append({
+					'orderId': data['orderId'],
+					'code': data['orderNumber'][-4:],
+					'dish_name': item['itemName'],
+					'number': item['number'],
+					'remark': data['remark'],
+					'time': data['endTime'],
+					'orderStatus': data['orderStatus'],
+				})
+		res = json.dumps({'code': 0, 'msg': '查询成功', 'count': len(d), 'data': d})
+		return res
+	else:  # 请求不带参数，返回页面
+		return template("index.html")
+
+
+@route("/login", method=["GET", "POST"])  # method 默认GET,可以指定其他请求或者请求方式列表
+def login():
+	if request.method == 'GET':
+		return template("login.html")
+	else:
+		params = {}
+		for item in request.params:
+			params[item] = request.params[item]
+		headers = {
+			'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac 05 X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36',
+		}
+		r1 = session.post(url="http://www.zitcloud.cn/login", data=params, headers=headers)
+		status1 = json.loads(r1.text)['result']
+		# status1 = True
+		if status1:  # 登录成功了
+			print('登录成功')
+			print(r1.text)
+			# 获取该账号下的小程序id
+			xcx_list = session.get(url='http://www.zitcloud.cn/user/MiniProgram/index', headers=headers)
+			# print('=====', r1.text)
+			pattern = re.compile(r'"miniPrograms":.*]')
+			s = '{' + re.search(pattern, xcx_list.text).group() + '}'
+			miniprograms = json.loads(s)['miniPrograms']
+			xcx_id = miniprograms[0]['id']
+
+			# 根据获取到的小程序id请求 小程序管理页面
+			xcx_manage = session.get(url='http://www.zitcloud.cn/user/xcx/manage/' + xcx_id, headers=headers)
+			restaurants_list = session.get(url='http://xcx.zitcloud.cn/api/restaurant/tables?length=10&start=0',
+										   headers=headers)
+			restaurants = []
+			for r in restaurants_list.json()['aaData']:
+				restaurants.append({'rid': r['id'], 'rname': r['name']})
+			print('restaurants', restaurants)
+			response.set_cookie('restaurants', str(restaurants))
+			return json.dumps(200)
+		else:
+			print('登录失败')
+			print(r1.text)
+			return json.dumps(400)
+
+
+@route("/consumeOrderById", method=["GET"])
+def consumeOrderById():
+	headers = {
+		'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac 05 X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36',
+	}
+	r1 = session.get(url="http://xcx.zitcloud.cn/api/order/consumeCustomer/" + request.query.get('orderId'),
+					 headers=headers)
+	if not r1.json():
+		return json.dumps(200)
+	else:
+		print('出错了')
+
+
+@route("/closeOrderById", method=["GET"])
+def closeOrderById():
+	headers = {
+		'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac 05 X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36',
+	}
+	print(request.query.get('orderId'))
+	r1 = session.get(url="http://xcx.zitcloud.cn/api/order/closeOrder/" + request.query.get('orderId'),
+					 headers=headers)
+	if not r1.json():
+		return json.dumps(200)
+	else:
+		print('出错了')
+
+
+@route("/requestWxData", method=["GET", "POST"])  # method 默认GET,可以指定其他请求或者请求方式列表
+def requestWxData():  # 接收微信小程序发来的订单
+	datas = []
+	for order in request.json:
+		for detail in order['orderDetails']:
+			print(order['id'], order['createDate'], order['number'], order['remark'], detail['number'],
+				  json.loads(detail['itemInfo'])['name'])
+
+
+@error(500)
+def error500(code):
+	return template('error.html')
 
 
 if __name__ == '__main__':
+	session = requests.Session()
 	host = '0.0.0.0' if get_host_ip() == '10.10.9.79' else 'localhost'
-	print(host)
-	run(host=host, port=10000, server=GeventWebSocketServer)
+	# print(host)
+	run(host=host, port=10000, server=GeventWebSocketServer, debug=True, reloader=True)
