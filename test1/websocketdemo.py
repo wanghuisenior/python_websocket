@@ -13,6 +13,7 @@ import json
 import os
 import re
 import socket
+from Logger import Logger
 
 try:
 	import requests
@@ -104,6 +105,7 @@ def index():
 			res = session.get(
 				url='http://xcx.zitcloud.cn/api/restaurant/order/orderList', headers=headers, params=q)
 			order_list = res.json()['orderVoList']
+			order_size = res.json()['allOrder']
 		except:
 			# 登录失效了
 			return json.dumps({'code': 400, 'msg': '请求失败，请重新登录'})
@@ -119,7 +121,7 @@ def index():
 					'time': data['endTime'],
 					'orderStatus': data['orderStatus'],
 				})
-		res = json.dumps({'code': 0, 'msg': '查询成功', 'count': len(d), 'data': d})
+		res = json.dumps({'code': 0, 'msg': '查询成功', 'count': order_size, 'data': d})
 		return res
 	else:  # 请求不带参数，返回页面
 		return template("index.html")
@@ -133,18 +135,21 @@ def login():
 		params = {}
 		for item in request.params:
 			params[item] = request.params[item]
+		print(params)
 		headers = {
 			'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac 05 X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36',
 		}
-		r1 = session.post(url="http://www.zitcloud.cn/login", data=params, headers=headers)
-		status1 = json.loads(r1.text)['result']
-		# status1 = True
-		if status1:  # 登录成功了
+		session.post(url="http://www.zitcloud.cn/login", data=params, headers=headers)
+		r1 = session.get(url="http://www.zitcloud.cn/user/profile/", headers=headers)
+		resp = {}
+		if '请先登录' in r1.text:
+			print('登录失败')
+			resp['result'] = False
+			resp['text'] = '登录失败'
+		else:
 			print('登录成功')
-			print(r1.text)
 			# 获取该账号下的小程序id
 			xcx_list = session.get(url='http://www.zitcloud.cn/user/MiniProgram/index', headers=headers)
-			# print('=====', r1.text)
 			pattern = re.compile(r'"miniPrograms":.*]')
 			s = '{' + re.search(pattern, xcx_list.text).group() + '}'
 			miniprograms = json.loads(s)['miniPrograms']
@@ -159,21 +164,22 @@ def login():
 				restaurants.append({'rid': r['id'], 'rname': r['name']})
 			print('restaurants', restaurants)
 			response.set_cookie('restaurants', str(restaurants))
-			return json.dumps(200)
-		else:
-			print('登录失败')
-			print(r1.text)
-			return json.dumps(400)
+			resp['result'] = True
+			resp['text'] = '登录成功'
+		print('resp', resp)
+		return json.dumps(resp)
 
 
 @route("/consumeOrderById", method=["GET"])
 def consumeOrderById():
+	orderId = request.query.get('orderId')
 	headers = {
 		'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac 05 X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36',
 	}
-	r1 = session.get(url="http://xcx.zitcloud.cn/api/order/consumeCustomer/" + request.query.get('orderId'),
+	r1 = session.get(url="http://xcx.zitcloud.cn/api/order/consumeCustomer/" + orderId,
 					 headers=headers)
 	if not r1.json():
+		Logger.log('consumeOrderById:' + orderId)
 		return json.dumps(200)
 	else:
 		print('出错了')
@@ -181,6 +187,7 @@ def consumeOrderById():
 
 @route("/closeOrderById", method=["GET"])
 def closeOrderById():
+	orderId = request.query.get('orderId')
 	headers = {
 		'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac 05 X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36',
 	}
@@ -188,6 +195,7 @@ def closeOrderById():
 	r1 = session.get(url="http://xcx.zitcloud.cn/api/order/closeOrder/" + request.query.get('orderId'),
 					 headers=headers)
 	if not r1.json():
+		Logger.log('closeOrder:' + orderId)
 		return json.dumps(200)
 	else:
 		print('出错了')

@@ -14,6 +14,8 @@ import socket
 
 import bottle
 
+from Logger import Logger
+
 try:
 	from bottle import route, run, static_file, request
 	from bottle.ext.websocket import GeventWebSocketServer

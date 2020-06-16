@@ -75,14 +75,14 @@
         <form class="layui-form zyl_pad_01">
             <div class="layui-col-sm12 layui-col-md12">
                 <div class="layui-form-item">
-                    <input type="text" name="username" lay-verify="required|userName" autocomplete="off"
+                    <input type="text" name="username" id="username" lay-verify="required|userName" autocomplete="off"
                            placeholder="账号" class="layui-input">
                     <i class="layui-icon layui-icon-username zyl_lofo_icon"></i>
                 </div>
             </div>
             <div class="layui-col-sm12 layui-col-md12">
                 <div class="layui-form-item">
-                    <input type="password" name="password" lay-verify="required|pass" autocomplete="off"
+                    <input type="password" name="password" id="password" lay-verify="required|pass" autocomplete="off"
                            placeholder="密码"
                            class="layui-input">
                     <i class="layui-icon layui-icon-password zyl_lofo_icon"></i>
@@ -143,17 +143,18 @@
 
         //监听提交
         form.on('submit(login)', function (data) {
-            // layer.alert(JSON.stringify(data.field), {
-            //     title: '最终的提交信息'
-            // })
-            $.post('login', data.field, function (res) {
-                if (res == 200) {
-                    layer.msg('登录成功', {'icon': 6, 'time': 800}, function () {
+            layer.load();
+            $.post('login', {'username': $('#username').val(), 'password': $('#password').val()}, function (res) {
+                var r = JSON.parse(res);
+                console.log(r)
+                if (r.result == true) {
+                    layer.msg(r.text, {icon: 1, time: 2000}, function () {
                         window.location.href = 'index';
-                    })
+                    });
                 } else {
-                    layer.msg('登录失败', {'icon': 5, 'time': 2000})
-                    window.location.reload();
+                    layer.msg(r.text, {icon: 5, time: 3000}, function () {
+                        window.location.reload();
+                    });
                 }
             })
             return false;

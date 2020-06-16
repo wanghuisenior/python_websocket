@@ -36,7 +36,7 @@
                 <div class="layui-row">
                     <div class="layui-col-md2">
                         <select name="restaurant" id="restaurant" lay-filter="restaurant">
-                            <option value="0">门店列表</option>
+                            <option value="-1">门店列表</option>
                         </select>
                     </div>
                     <div class="layui-col-md4">
@@ -76,16 +76,23 @@
         tableInstance.render({
             elem: '#test-table-simple',
             url: 'index',
+            title: '订单表',
             cellMinWidth: 80, //全局定义常规单元格的最小宽度，layui 2.2.1 新增
             page: true,
-            limit: 10,//每页默认显示的数量
+            limit: 5,//每页默认显示的数量
+            limits: [], //每页条数的选择项，默认：[10,20,30,40,50,60,70,80,90]。
             where: {'restaurantid': $('#restaurant').val()},
             even: true,
             loading: true, //翻页加loading
             size: 'lg',
             // request: {limitName: 'page_size'},
             cols: [[
-                {type: 'numbers', title: '序号'},
+                {
+                    title: '序号', width: 50, align: 'center', templet: function (d) {
+                        var index = d.LAY_TABLE_INDEX + 1;
+                        return '<div>' + index + '</div>'
+                    }
+                },
                 {field: 'code', width: 100, title: '预约号', align: 'center'},
                 {field: 'dish_name', title: '菜品名称', align: 'center'},
                 {field: 'number', width: 60, title: '数量', align: 'center'},
@@ -111,7 +118,10 @@
             ]],
             done: function (result, page, count) {
                 layer.closeAll();
-                // console.log(data, page, count)
+                if (result.code==200){
+                    merge(result);
+                }
+
             }
         });
         //监听每行右侧工具栏事件
@@ -150,6 +160,44 @@
         });
 
     });
+
+    function merge(res) {
+        var data = res.data;
+        var mergeIndex = 0;//定位需要添加合并属性的行数
+        var mark = 1; //这里涉及到简单的运算，mark是计算每次需要合并的格子数
+        var columsName = ['numbers', 'code'];//需要合并的列名称
+        var columsIndex = [0, 1];//需要合并的列索引值
+
+        for (var k = 1; k < columsName.length; k++) { //这里循环所有要合并的列
+            var trArr = $(".layui-table-body>.layui-table").find("tr");//所有行
+            for (var i = 1; i < res.data.length; i++) { //这里循环表格当前的数据
+                var tdCurArr = trArr.eq(i).find("td").eq(columsIndex[k]);//获取当前行的当前列
+                var tdCurArr0 = trArr.eq(i).find("td").eq(columsIndex[0]);//获取当前行的当前列
+                var tdPreArr = trArr.eq(mergeIndex).find("td").eq(columsIndex[k]);//获取相同列的第一列
+                var tdPreArr0 = trArr.eq(mergeIndex).find("td").eq(columsIndex[0]);//获取相同列的第一列
+                if (data[i][columsName[k]] === data[i - 1][columsName[k]]) { //后一行的值与前一行的值做比较，相同就需要合并
+                    mark += 1;
+                    tdPreArr.each(function () {//相同列的第一列增加rowspan属性
+                        $(this).attr("rowspan", mark);
+                    });
+                    tdPreArr0.each(function () {//相同列的第一列增加rowspan属性
+                        $(this).attr("rowspan", mark);
+                    });
+                    tdCurArr.each(function () {//当前行隐藏
+                        $(this).css("display", "none");
+                    });
+                    tdCurArr0.each(function () {//当前行隐藏
+                        $(this).css("display", "none");
+                    });
+                } else {
+                    mergeIndex = i;
+                    mark = 1;//一旦前后两行的值不一样了，那么需要合并的格子数mark就需要重新计算
+                }
+            }
+            mergeIndex = 0;
+            mark = 1;
+        }
+    }
 
     function tableReload() {
         var i = layer.load();
