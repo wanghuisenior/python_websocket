@@ -132,10 +132,12 @@ def login():
 	if request.method == 'GET':
 		return template("login.html")
 	else:
+		session.cookies.clear() #清空原有session 避免成为全局变量
 		params = {}
 		for item in request.params:
 			params[item] = request.params[item]
 		print(params)
+		# request.session.flush()
 		headers = {
 			'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac 05 X 10_11_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36',
 		}
@@ -154,7 +156,7 @@ def login():
 			s = '{' + re.search(pattern, xcx_list.text).group() + '}'
 			miniprograms = json.loads(s)['miniPrograms']
 			xcx_id = miniprograms[0]['id']
-
+			print('xcx_id', xcx_id)
 			# 根据获取到的小程序id请求 小程序管理页面
 			xcx_manage = session.get(url='http://www.zitcloud.cn/user/xcx/manage/' + xcx_id, headers=headers)
 			restaurants_list = session.get(url='http://xcx.zitcloud.cn/api/restaurant/tables?length=10&start=0',
@@ -216,7 +218,7 @@ def error500(code):
 
 
 if __name__ == '__main__':
-	session = requests.Session()
+	session = requests.session()
 	host = '0.0.0.0' if get_host_ip() == '10.10.9.79' else 'localhost'
 	# print(host)
 	run(host=host, port=10000, server=GeventWebSocketServer, debug=True, reloader=True)
