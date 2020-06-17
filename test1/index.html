@@ -87,12 +87,13 @@
             size: 'lg',
             // request: {limitName: 'page_size'},
             cols: [[
-                {
-                    title: '序号', width: 50, align: 'center', templet: function (d) {
-                        var index = d.LAY_TABLE_INDEX + 1;
-                        return '<div>' + index + '</div>'
-                    }
-                },
+                // {field: 'num',
+                //     title: '序号', width: 60, align: 'center', templet: function (d) {
+                //         var index = d.LAY_TABLE_INDEX + 1;
+                //         return '<div>' + index + '</div>'
+                //     }
+                // },
+                {type: 'numbers', title: '序号'},
                 {field: 'code', width: 100, title: '预约号', align: 'center'},
                 {field: 'dish_name', title: '菜品名称', align: 'center'},
                 {field: 'number', width: 60, title: '数量', align: 'center'},
@@ -113,12 +114,18 @@
                 },
                 {field: 'orderStatus', width: 100, title: '订单状态', align: 'center'},
                 {
-                    field: '', width: 180, toolbar: '#barDemo', title: '操作', align: 'center',
+                    field: '', width: 180, title: '操作', align: 'center',
+                    templet: function (d) {
+                        if (d.orderStatus == '已完成') {
+                            return '<a class="layui-btn layui-btn-sm" lay-event="check">查看详情</a>'
+                        } else return '<a class="layui-btn layui-btn-sm" lay-event="yes">确认</a>\n' +
+                            '<a class="layui-btn layui-btn-danger layui-btn-sm" lay-event="no">关闭</a>'
+                    }
                 }
             ]],
             done: function (result, page, count) {
                 layer.closeAll();
-                if (result.code==200){
+                if (result.code == 200) {
                     merge(result);
                 }
 
@@ -148,6 +155,9 @@
                             } else layer.msg('失败', {icon: 2});
                         })
                     });
+                    break;
+                case 'check':
+                    layer.msg('查看');
                     break;
 
             }
